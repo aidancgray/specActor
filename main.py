@@ -1,16 +1,14 @@
-# This is a sample Python script.
+#!/usr/bin/env python3
+# specActor
+# 12/18/2020
+# Aidan Gray
+# aidan.gray@idg.jhu.edu
+#
+# This is an actor for the BOSS specMech hardware microcontroller.
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import asyncio
+import time
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    print('Hello World')
