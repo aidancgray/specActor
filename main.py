@@ -6,6 +6,7 @@
 #
 # This is an actor for the BOSS specMech hardware microcontroller.
 
+# from clu import LegacyActor, command_parser
 from contextlib import suppress
 import asyncio
 
@@ -24,7 +25,7 @@ class SpechConnect:
             self.ip, self.port)
 
     async def send_data(self, message):
-        print(f'Send: {message!r}')
+        print(f'Sent: {message!r}')
         self.writer.write(message.encode())
         await self.read_data()
 
@@ -32,6 +33,10 @@ class SpechConnect:
         data = await self.reader.read(1024)
         print(f'Received: {data.decode()!r}')
         self.response = data.decode()
+        while self.response[-1] != '>':
+            data = await self.reader.read(1024)
+            print(f'Received: {data.decode()!r}')
+            self.response = self.response + data.decode()
 
     async def close_server(self):
         print('Closing the connection')
@@ -54,17 +59,13 @@ async def shutdown():
 
 async def process_command(writer, message):
     # Process the command
-    print(f'Processing {message}')
-
     await specMech.send_data(message)
-
-    writer.write(specMech.response.encode())
+    writer.write(('SPECMECH: '+repr(specMech.response)+'\r\n').encode())
 
 
 async def check_data(clientWriter, message):
     # Perform error checking on the input
-    print(f'Checking {message}')
-    clientWriter.write(message.encode())
+    # clientWriter.write(message.encode())
     check = True
 
     if check:
