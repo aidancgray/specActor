@@ -6,32 +6,8 @@
 #
 # This is an actor for the BOSS specMech hardware microcontroller.
 
-from clu import LegacyActor, command_parser
 from contextlib import suppress
 import asyncio
-import click
-
-
-@command_parser.command()
-@click.argument('DATA', type=str)
-async def talk(command, data):
-    dataTemp = data+'\r'
-    await specMech.send_data(dataTemp)
-
-    if "$S2ERR*24" in specMech.response:
-        messageCode = 'f'
-    else:
-        messageCode = ':'
-
-    command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
-    command.finish()
-
-
-class SpecActor(LegacyActor):
-    def __init__(self):
-        super().__init__(name='spec_actor',
-                         host='localhost', port=9999,
-                         version='0.1.0')
 
 
 class SpecConnect:
@@ -67,9 +43,64 @@ class SpecConnect:
         self.writer.close()
 
 
+async def shutdown():
+    print('~~~ Shutting down...')
+    print('~~~ cancelling task:')
+    i = 1
+    for task in asyncio.all_tasks():
+        print(f'~~~ {i}')
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        i += 1
+    print('~~~ Done.')
+
+
+async def process_command(writer, message):
+    # Process the command
+    await specMech.send_data(message)
+    writer.write(('SPECMECH: '+repr(specMech.response)+'\r\n').encode())
+
+
+async def check_data(clientWriter, message):
+    # Perform error checking on the input
+    # clientWriter.write(message.encode())
+    check = True
+
+    if check:
+        asyncio.create_task(process_command(clientWriter, message))
+
+
+async def handle_data(clientReader, clientWriter):
+    dataLoop = True
+    while dataLoop:
+        data = await clientReader.read(100)
+        message = data.decode()
+        addr = clientWriter.get_extra_info('peername')
+        print(f"Received {message!r} from {addr!r}")
+
+        if message[:-2] == 'q':
+            dataLoop = False
+        elif message[:-2] == 'stop':
+            await specMech.close_server()
+        elif message[:-2] == 'start':
+            await specMech.start_server()
+        else:
+            await check_data(clientWriter, message)
+            await clientWriter.drain()
+
+    await clientWriter.drain()
+    clientWriter.close()
+
+
 async def actor_server():
-    spec_actor = await SpecActor().start()
-    await spec_actor.run_forever()
+    server = await asyncio.start_server(handle_data, '127.0.0.1', 8887)
+
+    addr = server.sockets[0].getsockname()
+    print(f"Serving on {addr}")
+
+    async with server:
+        await server.serve_forever()
 
 
 async def main():
