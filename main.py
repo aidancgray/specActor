@@ -13,10 +13,27 @@ import click
 
 
 @command_parser.command()
+async def ACK(command):
+    """
+    'ACK' command acknowledges the specMech has rebooted and informs the user
+    """
+    dataTemp = '!\r'
+    await specMech.send_data(dataTemp)
+
+    if '$S2ERR*24' in specMech.response:
+        messageCode = 'f'
+    else:
+        messageCode = ':'
+
+    command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+    command.finish()
+
+
+@command_parser.command()
 @click.argument('DATA', type=str)
 async def talk(command, data):
     """
-    'Talk' command to send data string directly as-is to the specMech
+    'talk' command to send data string directly as-is to the specMech
 
     Args:
         data (str): The string to send to specMech
@@ -33,10 +50,65 @@ async def talk(command, data):
     command.finish()
 
 
+@command_parser.command()
+@click.argument('OFFSET', type=int)
+async def focus(command, offset):
+    """
+    'focus' command to send data string directly as-is to the specMech
+
+    Args:
+        offset (int): Piston all collimator motors together by this value
+    """
+    dataTemp = f'mp {offset}\r'
+    await specMech.send_data(dataTemp)
+
+    if '$S2ERR*24' in specMech.response:
+        messageCode = 'f'
+    else:
+        messageCode = ':'
+
+    command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+    command.finish()
+
+
+@command_parser.command()
+@click.argument('EXPOSURE', type=click.Choice(['left', 'right', 'start', 'end']),
+                default='start')
+async def expose(command, exposure):
+    """
+        'expose' command to tell the specMech which Hartmann Doors
+        to open or close.
+
+        Args:
+            exposure (str): This can be left/right/start/end. The first 3 open
+                        either the left, right, or both doors. The last closes
+                        everything that is open.
+        """
+    if exposure == 'left':
+        dataTemp = 'el\r'
+    elif exposure == 'right':
+        dataTemp = 'er\r'
+    elif exposure == 'start':
+        dataTemp = 'es\r'
+    elif exposure == 'end':
+        dataTemp = 'ee\r'
+    else:
+        dataTemp = 'es\r'
+
+    await specMech.send_data(dataTemp)
+
+    if '$S2ERR*24' in specMech.response:
+        messageCode = 'f'
+    else:
+        messageCode = ':'
+
+    command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+    command.finish()
+
+
 class SpecActor(LegacyActor):
     """
     A legacy-style actor that accepts commands to control the specMech
-
     """
     def __init__(self):
         super().__init__(name='spec_actor',
@@ -62,7 +134,6 @@ class SpecConnect:
     async def start_server(self):
         """
         Opens a connection with the given ip & port
-
         """
         print(f'Opening connection with {self.ip} on port {self.port}')
         self.reader, self.writer = await asyncio.open_connection(
@@ -71,9 +142,9 @@ class SpecConnect:
     async def send_data(self, message):
         """
         Sends the given string to the specMech and then awaits a response.
+
         Args:
             message (str): A string that is sent to specMech
-
         """
         print(f'Sent: {message!r}')
         self.writer.write(message.encode())
@@ -82,9 +153,7 @@ class SpecConnect:
     async def read_data(self):
         """
         Awaits responses from specMech until the EOM character '>' is seen.
-
         The data received from specMech is added to the response variable.
-
         """
         data = await self.reader.read(1024)
         print(f'Received: {data.decode()!r}')
@@ -97,7 +166,6 @@ class SpecConnect:
     async def close_server(self):
         """
         Closese the connection with specMech
-
         """
         print('Closing the connection')
         await self.send_data('q\r\n')
@@ -107,7 +175,6 @@ class SpecConnect:
 async def actor_server():
     """
     Async method to serve up the specActor server.
-
     """
     spec_actor = await SpecActor().start()
     await spec_actor.run_forever()
@@ -116,7 +183,6 @@ async def actor_server():
 async def main():
     """
     Runs the server and client coroutines
-
     """
     with suppress(asyncio.CancelledError):
         taskServer = asyncio.create_task(specMech.start_server())
