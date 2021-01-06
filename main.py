@@ -54,12 +54,33 @@ async def talk(command, data):
 @click.argument('OFFSET', type=int)
 async def focus(command, offset):
     """
-    'focus' command to send data string directly as-is to the specMech
+    'focus' command to send an offset to the specMech's 3 collimator motors
 
     Args:
         offset (int): Piston all collimator motors together by this value
     """
-    dataTemp = f'mp {offset}\r'
+    dataTemp = f'mp{offset}\r'
+    await specMech.send_data(dataTemp)
+
+    if '$S2ERR*24' in specMech.response:
+        messageCode = 'f'
+    else:
+        messageCode = ':'
+
+    command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+    command.finish()
+
+
+@command_parser.command()
+@click.argument('TIME', type=str)
+async def set_time(command, time):
+    """
+    'set-time' command to set the clock time of the specMech
+
+    Args:
+        time (str): The clock time in format: YYYY-MM-DDThh:mm:ssZ
+    """
+    dataTemp = f'st{time}\r'
     await specMech.send_data(dataTemp)
 
     if '$S2ERR*24' in specMech.response:
