@@ -127,6 +127,109 @@ async def expose(command, exposure):
     command.finish()
 
 
+@command_parser.command()
+async def status(command):
+    """
+    'status' command queries specMech for all status responses
+    """
+    await specMech.send_data('rs\r')
+
+    if '$S2ERR*24' in specMech.response:
+        messageCode = 'f'
+    else:
+        messageCode = ':'
+
+    # Parse the status response. Write a reply to the user for each relevant
+    #  status string. This may be changed later.
+    statusList = specMech.response.split("\r\n")
+    strpList = []
+
+    for n in statusList:  # separate the individual status responses
+        if '$S2' in n:
+            strpList.append(n[3:-3])
+
+    finalList = []
+    for m in strpList:  # for each status response, split up the components
+        finalList.append(m.split(','))
+
+    # initialize all keyword vars, just to be safe
+    btm = mra = mrb = mrc = env0t = env0h = env1t = env1h = env2t = env2h = ''
+    env3t = env3h = ionr = ionb = accx = accy = accz = pnus = pnul = pnur = ''
+    pnup = tim = ver = ''
+
+    for stat in finalList:  # establish each keyword=value pair
+        if stat[0] == 'BTM':
+            btm = stat[1]
+
+        elif stat[0] == 'MRA':
+            mra = stat[1]
+
+        elif stat[0] == 'MRB':
+            mrb = stat[1]
+
+        elif stat[0] == 'MRC':
+            mrc = stat[1]
+
+        elif stat[0] == 'ENV':
+            env0t = stat[1]
+            env0h = stat[2]
+            env1t = stat[4]
+            env1h = stat[5]
+            env2t = stat[7]
+            env2h = stat[8]
+            env3t = stat[10]
+            env3h = stat[11]
+
+        elif stat[0] == 'ION':
+            ionr = stat[1]
+            ionb = stat[3]
+
+        elif stat[0] == 'ACC':
+            accx = stat[1]
+            accy = stat[2]
+            accz = stat[3]
+
+        elif stat[0] == 'PNU':
+            pnus = stat[1]
+            pnul = stat[3]
+            pnur = stat[5]
+            pnup = stat[7]
+
+        elif stat[0] == 'TIM':
+            tim = stat[1]
+
+        elif stat[0] == 'VER':
+            ver = stat[1]
+
+    command.write(messageCode, BTM=f'{btm}')
+    command.write(messageCode, TIM=f'{tim}')
+    command.write(messageCode, VER=f'{ver}')
+    command.write(messageCode, MRA=f'{mra}')
+    command.write(messageCode, MRB=f'{mrb}')
+    command.write(messageCode, MRC=f'{mrc}')
+    command.write(messageCode, ENV0T=f'{env0t}')
+    command.write(messageCode, ENV0H=f'{env0h}')
+    command.write(messageCode, ENV1T=f'{env1t}')
+    command.write(messageCode, ENV1H=f'{env1h}')
+    command.write(messageCode, ENV2T=f'{env2t}')
+    command.write(messageCode, ENV2H=f'{env2h}')
+    command.write(messageCode, ENV3T=f'{env3t}')
+    command.write(messageCode, ENV3H=f'{env3h}')
+    command.write(messageCode, IONR=f'{ionr}')
+    command.write(messageCode, IONB=f'{ionb}')
+    command.write(messageCode, ACCX=f'{accx}')
+    command.write(messageCode, ACCY=f'{accy}')
+    command.write(messageCode, ACCZ=f'{accz}')
+    command.write(messageCode, PNUS=f'{pnus}')
+    command.write(messageCode, PNUL=f'{pnul}')
+    command.write(messageCode, PNUR=f'{pnur}')
+    command.write(messageCode, PNUP=f'{pnup}')
+
+    # raw specmech response, in case we want that too/instead
+    # command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+    # command.finish()
+
+
 class SpecActor(LegacyActor):
     """
     A legacy-style actor that accepts commands to control the specMech
