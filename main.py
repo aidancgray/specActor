@@ -230,10 +230,31 @@ async def status(command):
                     accz = stat[3]
 
                 elif stat[0] == 'PNU':
-                    pnus = stat[1]
-                    pnul = stat[3]
-                    pnur = stat[5]
-                    pnup = stat[7]
+                    if stat[1] == 'c':
+                        pnus = 'closed'
+                    elif stat[1] == 'o':
+                        pnus = 'open'
+                    else:
+                        pnus = 'transiting'
+
+                    if stat[3] == 'c':
+                        pnul = 'closed'
+                    elif stat[3] == 'o':
+                        pnul = 'open'
+                    else:
+                        pnul = 'transiting'
+
+                    if stat[5] == 'c':
+                        pnur = 'closed'
+                    elif stat[5] == 'o':
+                        pnur = 'open'
+                    else:
+                        pnur = 'transiting'
+
+                    if stat[7] == '0':
+                        pnup = 'off'
+                    elif stat[7] == '1':
+                        pnup = 'on'
 
                 elif stat[0] == 'TIM':
                     tim = stat[1]
