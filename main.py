@@ -8,8 +8,19 @@
 
 from clu import LegacyActor, command_parser
 from contextlib import suppress
+import clu
 import asyncio
 import click
+import warnings
+
+
+@command_parser.command()
+async def test(command, msg):
+    """
+    'test' command is just for testing
+    """
+    messageCode = ':'
+    command.write(messageCode, text=f'{msg}')
 
 
 @command_parser.command()
@@ -17,15 +28,15 @@ async def ACK(command):
     """
     'ACK' command acknowledges the specMech has rebooted and informs the user
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
         dataTemp = '!\r'
-        specMech.response = ''
-        await specMech.send_data(dataTemp)
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='ERR')
         else:
@@ -42,20 +53,20 @@ async def talk(command, data):
     Args:
         data (str): The string to send to specMech
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
         dataTemp = data+'\r'
-        specMech.response = ''
-        await specMech.send_data(dataTemp)
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
         else:
             messageCode = ':'
 
-        command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
+        command.write(messageCode, SPECMECH=f'{repr(specActor.response)}')
 
 
 @command_parser.command()
@@ -67,18 +78,18 @@ async def focus(command, offset):
     Args:
         offset (int): Piston all collimator motors together by this value
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
         dataTemp = f'mp{offset}\r'
-        specMech.response = ''
-        await specMech.send_data(dataTemp)
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='ERR')
-        elif '!' in specMech.response:
+        elif '!' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='SPECMECH HAS REBOOTED')
         else:
@@ -95,18 +106,18 @@ async def set_time(command, time):
     Args:
         time (str): The clock time in format: YYYY-MM-DDThh:mm:ssZ
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
         dataTemp = f'st{time}\r'
-        specMech.response = ''
-        await specMech.send_data(dataTemp)
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='ERR')
-        elif '!' in specMech.response:
+        elif '!' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='SPECMECH HAS REBOOTED')
         else:
@@ -127,7 +138,7 @@ async def expose(command, exposure):
                         either the left, right, or both doors. The last closes
                         everything that is open.
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
@@ -142,13 +153,87 @@ async def expose(command, exposure):
         else:
             dataTemp = 'es\r'
 
-        specMech.response = ''
-        await specMech.send_data(dataTemp)
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='ERR')
-        elif '!' in specMech.response:
+        elif '!' in specActor.response:
+            messageCode = 'f'
+            command.write(messageCode, text='SPECMECH HAS REBOOTED')
+        else:
+            messageCode = ':'
+            command.write(messageCode, text='OK')
+
+
+@command_parser.command(name='open')
+@click.argument('DOOR', type=click.Choice(['left', 'right', 'shutter']),
+                default='shutter')
+async def openDoor(command, door):
+    """
+    'open' command opens left, right, or shutter
+
+    Args:
+        door (str): This can be left/right/shutter.
+    """
+    if '>' not in specActor.response:
+        messageCode = 'f'
+        command.write(messageCode, text='WAIT FOR >')
+    else:
+        if door == 'left':
+            dataTemp = 'ol\r'
+        elif door == 'right':
+            dataTemp = 'or\r'
+        elif door == 'shutter':
+            dataTemp = 'os\r'
+        else:
+            dataTemp = 'os\r'
+
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
+
+        if '$S2ERR*24' in specActor.response:
+            messageCode = 'f'
+            command.write(messageCode, text='ERR')
+        elif '!' in specActor.response:
+            messageCode = 'f'
+            command.write(messageCode, text='SPECMECH HAS REBOOTED')
+        else:
+            messageCode = ':'
+            command.write(messageCode, text='OK')
+
+
+@command_parser.command(name='close')
+@click.argument('DOOR', type=click.Choice(['left', 'right', 'shutter']),
+                default='shutter')
+async def closeDoor(command, door):
+    """
+    'close' command closes left, right, or shutter
+
+    Args:
+        door (str): This can be left/right/shutter.
+    """
+    if '>' not in specActor.response:
+        messageCode = 'f'
+        command.write(messageCode, text='WAIT FOR >')
+    else:
+        if door == 'left':
+            dataTemp = 'cl\r'
+        elif door == 'right':
+            dataTemp = 'cr\r'
+        elif door == 'shutter':
+            dataTemp = 'cs\r'
+        else:
+            dataTemp = 'cs\r'
+
+        specActor.response = ''
+        await specActor.send_data(dataTemp)
+
+        if '$S2ERR*24' in specActor.response:
+            messageCode = 'f'
+            command.write(messageCode, text='ERR')
+        elif '!' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='SPECMECH HAS REBOOTED')
         else:
@@ -161,17 +246,17 @@ async def status(command):
     """
     'status' command queries specMech for all status responses
     """
-    if '>' not in specMech.response:
+    if '>' not in specActor.response:
         messageCode = 'f'
         command.write(messageCode, text='WAIT FOR >')
     else:
-        specMech.response = ''
-        await specMech.send_data('rs\r')
+        specActor.response = ''
+        await specActor.send_data('rs\r')
 
-        if '$S2ERR*24' in specMech.response:
+        if '$S2ERR*24' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='ERR')
-        elif '!' in specMech.response:
+        elif '!' in specActor.response:
             messageCode = 'f'
             command.write(messageCode, text='SPECMECH HAS REBOOTED')
         else:
@@ -179,7 +264,7 @@ async def status(command):
 
             # Parse the status response. Write a reply to the user for each relevant
             #  status string. This may be changed later.
-            statusList = specMech.response.split("\r\n")
+            statusList = specActor.response.split("\r\n")
             strpList = []
 
             for n in statusList:  # separate the individual status responses
@@ -230,6 +315,8 @@ async def status(command):
                     accz = stat[3]
 
                 elif stat[0] == 'PNU':
+                    # change the c/o/t and 0/1 responses of specMech
+                    # to something more readable
                     if stat[1] == 'c':
                         pnus = 'closed'
                     elif stat[1] == 'o':
@@ -292,32 +379,49 @@ class SpecActor(LegacyActor):
     """
     def __init__(self):
         super().__init__(name='spec_actor',
-                         host='localhost', port=9999,
+                         host='localhost',
+                         port=9999,
                          version='0.1.0')
 
-
-class SpecConnect:
-    """
-    A class for connecting to & communicating with the specMech.
-
-    Args:
-        ip (str): the IP address of the specMech
-        port (int): the port # the specMech is listening on
-    """
-    def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
+        # for the specMech connection
+        self.ip = '127.0.0.1'
+        self.specMechPort = 8888
         self.reader = None
         self.writer = None
         self.response = '>'
+
+    async def start(self):
+        """Starts the server and the Tron client connection."""
+
+        await self._server.start()
+        self.log.info(f'running TCP server on {self.host}:{self.port}')
+
+        # Start tron connection
+        try:
+            if self.tron:
+                await self.tron.start()
+                self.log.info('started tron connection at '
+                              f'{self.tron.host}:{self.tron.port}')
+            else:
+                warnings.warn('starting LegacyActor without Tron connection.',
+                              clu.CluWarning)
+        except (ConnectionRefusedError, OSError) as ee:
+            warnings.warn(f'connection to tron was refused: {ee}. '
+                          'Some functionality will be limited.', clu.CluWarning)
+
+        self.timed_commands.start()
+
+        await self.start_server()
+
+        return self
 
     async def start_server(self):
         """
         Opens a connection with the given ip & port
         """
-        print(f'Opening connection with {self.ip} on port {self.port}')
+        print(f'Opening connection with {self.ip} on port {self.specMechPort}')
         self.reader, self.writer = await asyncio.open_connection(
-            self.ip, self.port)
+            self.ip, self.specMechPort)
 
     async def send_data(self, message):
         """
@@ -356,7 +460,7 @@ async def actor_server():
     """
     Async method to serve up the specActor server.
     """
-    spec_actor = await SpecActor().start()
+    spec_actor = await specActor.start()
     await spec_actor.run_forever()
 
 
@@ -365,12 +469,12 @@ async def main():
     Runs the server and client coroutines
     """
     with suppress(asyncio.CancelledError):
-        taskServer = asyncio.create_task(specMech.start_server())
-        taskClient = asyncio.create_task(actor_server())
-        await asyncio.gather(taskServer, taskClient)
+        # taskClient = asyncio.create_task(actor_server())
+        # await asyncio.gather(taskClient)
+        await actor_server()
 
 if __name__ == "__main__":
-    specMech = SpecConnect('127.0.0.1', 8888)
+    specActor = SpecActor()
 
     try:
         asyncio.run(main())
