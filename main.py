@@ -32,9 +32,6 @@ async def ACK(command):
             messageCode = ':'
             command.write(messageCode, text='OK')
 
-        # command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
-    command.finish()
-
 
 @command_parser.command()
 @click.argument('DATA', type=str)
@@ -59,8 +56,6 @@ async def talk(command, data):
             messageCode = ':'
 
         command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
-
-    command.finish()
 
 
 @command_parser.command()
@@ -90,8 +85,6 @@ async def focus(command, offset):
             messageCode = ':'
             command.write(messageCode, text='OK')
 
-    command.finish()
-
 
 @command_parser.command()
 @click.argument('TIME', type=str)
@@ -119,8 +112,6 @@ async def set_time(command, time):
         else:
             messageCode = ':'
             command.write(messageCode, text='OK')
-
-    command.finish()
 
 
 @command_parser.command()
@@ -164,8 +155,6 @@ async def expose(command, exposure):
             messageCode = ':'
             command.write(messageCode, text='OK')
 
-    command.finish()
-
 
 @command_parser.command()
 async def status(command):
@@ -186,7 +175,7 @@ async def status(command):
             messageCode = 'f'
             command.write(messageCode, text='SPECMECH HAS REBOOTED')
         else:
-            messageCode = ':'
+            messageCode = 'i'
 
             # Parse the status response. Write a reply to the user for each relevant
             #  status string. This may be changed later.
@@ -195,7 +184,9 @@ async def status(command):
 
             for n in statusList:  # separate the individual status responses
                 if '$S2' in n:
-                    strpList.append(n[3:-3])
+                    tempStr1 = n[3:]  # remove '$S2'
+                    tempStr2 = tempStr1.split('*')[0]  # remove the NMEA checksum
+                    strpList.append(tempStr2)
 
             finalList = []
             for m in strpList:  # for each status response, split up the components
@@ -250,33 +241,28 @@ async def status(command):
                 elif stat[0] == 'VER':
                     ver = stat[1]
 
-            command.write(messageCode, BTM=f'{btm}')
-            command.write(messageCode, TIM=f'{tim}')
-            command.write(messageCode, VER=f'{ver}')
-            command.write(messageCode, MRA=f'{mra}')
-            command.write(messageCode, MRB=f'{mrb}')
-            command.write(messageCode, MRC=f'{mrc}')
-            command.write(messageCode, ENV0T=f'{env0t}')
-            command.write(messageCode, ENV0H=f'{env0h}')
-            command.write(messageCode, ENV1T=f'{env1t}')
-            command.write(messageCode, ENV1H=f'{env1h}')
-            command.write(messageCode, ENV2T=f'{env2t}')
-            command.write(messageCode, ENV2H=f'{env2h}')
-            command.write(messageCode, ENV3T=f'{env3t}')
-            command.write(messageCode, ENV3H=f'{env3h}')
-            command.write(messageCode, IONR=f'{ionr}')
-            command.write(messageCode, IONB=f'{ionb}')
-            command.write(messageCode, ACCX=f'{accx}')
-            command.write(messageCode, ACCY=f'{accy}')
-            command.write(messageCode, ACCZ=f'{accz}')
-            command.write(messageCode, PNUS=f'{pnus}')
-            command.write(messageCode, PNUL=f'{pnul}')
-            command.write(messageCode, PNUR=f'{pnur}')
-            command.write(messageCode, PNUP=f'{pnup}')
+            command.write(messageCode,
+                          systemInfo=f'(bootTime={btm}, clockTime={tim}, version={ver})')
 
-            # raw specmech response, in case we want that too/instead
-            # command.write(messageCode, SPECMECH=f'{repr(specMech.response)}')
-    command.finish()
+            command.write(messageCode,
+                          motorPositions=f'(motorA={mra}, motorB={mrb}, motorC={mrc})')
+
+            command.write(messageCode,
+                          environments=f'(Temperature0={env0t}, Humidity0={env0h}, '
+                                       f'Temperature1={env1t}, Humidity1={env1h}, '
+                                       f'Temperature2={env2t}, Humidity2={env2h}, '
+                                       f'Temperature3={env3t}, Humidity3={env3h})')
+
+            command.write(messageCode,
+                          ionPumpVoltages=f'(redDewarVoltage={ionr}, blueDewarVoltage={ionb})')
+
+            command.write(messageCode,
+                          accelerometer=f'(xAxis={accx}, yAxis={accy}, zAxis={accz})')
+
+            command.write(messageCode,
+                          pneumatics=f'(shutter={pnus}, leftHartmann={pnul}, rightHartmann={pnur}, airPressure={pnup})')
+
+            command.finish()
 
 
 class SpecActor(LegacyActor):
