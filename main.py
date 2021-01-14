@@ -383,12 +383,17 @@ class SpecActor(LegacyActor):
                          port=9999,
                          version='0.1.0')
 
-        # for the specMech connection
-        self.ip = '127.0.0.1'
-        self.specMechPort = 8888
         self.reader = None
         self.writer = None
         self.response = '>'
+
+        # For the specMech emulator connection
+        self.ip = '127.0.0.1'
+        self.specMechPort = 8888
+
+        # For the real specMech connection
+        # self.ip = 'specmech.mywire.org'
+        # self.specMechPort = 23
 
     async def start(self):
         """Starts the server and the Tron client connection."""
@@ -439,13 +444,16 @@ class SpecActor(LegacyActor):
         Awaits responses from specMech until the EOM character '>' is seen.
         The data received from specMech is added to the response variable.
         """
-        data = await self.reader.read(1024)
-        print(f'Received: {data.decode()!r}')
-        self.response = data.decode()
-        while self.response[-1] != '>':
-            data = await self.reader.read(1024)
-            print(f'Received: {data.decode()!r}')
-            self.response = self.response + data.decode()
+        dataRaw = await self.reader.read(1024)
+        dataB = bytearray(dataRaw)
+
+        # Continue accepting responses until '>' is received
+        while bytearray(b'>') not in dataB:
+            dataRaw = await self.reader.read(1024)
+            dataB.extend(bytearray(dataRaw))
+
+        self.response = dataB.decode('utf-8', 'ignore')
+        print(f'Received: {self.response}')
 
     async def close_server(self):
         """
