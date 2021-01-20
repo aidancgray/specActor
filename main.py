@@ -5,6 +5,7 @@
 # aidan.gray@idg.jhu.edu
 #
 # This is an actor for the BOSS specMech hardware microcontroller.
+from abc import ABC
 
 from clu import LegacyActor, command_parser
 from contextlib import suppress
@@ -12,6 +13,56 @@ import clu
 import asyncio
 import click
 import warnings
+from telnetlib3 import *
+import telnetlib3
+
+
+# Extending the handle_subnegotiation method of TelnetWriter from telnetlib3
+# to handle the COM_PORT_OPTION error
+class TelnetWriter(TelnetWriter, ABC):
+
+    def handle_subnegotiation(self, buf):
+        """
+        Callback for end of sub-negotiation buffer.
+
+            SB options handled here are TTYPE, XDISPLOC, NEW_ENVIRON,
+            NAWS, and STATUS, and are delegated to their ``handle_``
+            equivalent methods. Implementors of additional SB options
+            should extend this method.
+        """
+        if not buf:
+            raise ValueError('SE: buffer empty')
+        if buf[0] == theNULL:
+            raise ValueError('SE: buffer is NUL')
+        if len(buf) == 1:
+            raise ValueError('SE: buffer too short: {!r}'.format(buf))
+
+        cmd = buf[0]
+        if self.pending_option.enabled(SB + cmd):
+            self.pending_option[SB + cmd] = False
+        else:
+            self.log.debug('[SB + {}] unsolicited'.format(name_command(cmd)))
+
+        fn_call = {LINEMODE: self._handle_sb_linemode,
+                   LFLOW: self._handle_sb_lflow,
+                   NAWS: self._handle_sb_naws,
+                   SNDLOC: self._handle_sb_sndloc,
+                   NEW_ENVIRON: self._handle_sb_environ,
+                   CHARSET: self._handle_sb_charset,
+                   TTYPE: self._handle_sb_ttype,
+                   TSPEED: self._handle_sb_tspeed,
+                   XDISPLOC: self._handle_sb_xdisploc,
+                   STATUS: self._handle_sb_status,
+                   COM_PORT_OPTION: self._handle_sb_com_port_option
+                   }.get(cmd)
+        if fn_call is None:
+            raise ValueError('SB unhandled: cmd={}, buf={!r}'
+                             .format(name_command(cmd), buf))
+
+        # fn_call(buf)
+
+    def _handle_sb_com_port_option(self, buf):
+        pass
 
 
 @command_parser.command()
@@ -104,7 +155,7 @@ async def set_time(command, time):
     'set-time' command to set the clock time of the specMech
 
     Args:
-        time (str): The clock time in format: YYYY-MM-DDThh:mm:ssZ
+        time (str): The clock time in format: YYYY-MM-DDThh:mm:ss
     """
     if '>' not in specActor.response:
         messageCode = 'f'
@@ -388,12 +439,12 @@ class SpecActor(LegacyActor):
         self.response = '>'
 
         # For the specMech emulator connection
-        self.ip = '127.0.0.1'
-        self.specMechPort = 8888
+        # self.ip = '127.0.0.1'
+        # self.specMechPort = 8888
 
         # For the real specMech connection
-        # self.ip = 'specmech.mywire.org'
-        # self.specMechPort = 23
+        self.ip = 'specmech.mywire.org'
+        self.specMechPort = 23
 
     async def start(self):
         """Starts the server and the Tron client connection."""
@@ -425,8 +476,8 @@ class SpecActor(LegacyActor):
         Opens a connection with the given ip & port
         """
         print(f'Opening connection with {self.ip} on port {self.specMechPort}')
-        self.reader, self.writer = await asyncio.open_connection(
-            self.ip, self.specMechPort)
+
+        self.reader, self.writer = await telnetlib3.open_connection(self.ip, self.specMechPort)
 
     async def send_data(self, message):
         """
@@ -436,7 +487,7 @@ class SpecActor(LegacyActor):
             message (str): A string that is sent to specMech
         """
         print(f'Sent: {message!r}')
-        self.writer.write(message.encode())
+        self.writer.write(message)
         await self.read_data()
 
     async def read_data(self):
@@ -445,15 +496,56 @@ class SpecActor(LegacyActor):
         The data received from specMech is added to the response variable.
         """
         dataRaw = await self.reader.read(1024)
-        dataB = bytearray(dataRaw)
+        # dataB = bytearray(dataRaw)
 
         # Continue accepting responses until '>' is received
-        while bytearray(b'>') not in dataB:
-            dataRaw = await self.reader.read(1024)
-            dataB.extend(bytearray(dataRaw))
+        # while bytearray(b'>') not in dataB:
+        #    dataRaw = await self.reader.read(1024)
+        #    dataB.extend(bytearray(dataRaw))
 
-        self.response = dataB.decode('utf-8', 'ignore')
-        print(f'Received: {self.response}')
+        print(f'raw = {dataRaw!r}')
+        # dataDecoded = dataRaw.decode('utf-8', 'ignore')
+        # print(f'fixed = {dataDecoded!r}')
+        self.response = dataRaw
+        print(f'Received: {self.response!r}')
+
+    # async def start_server(self):
+    #     """
+    #     Opens a connection with the given ip & port
+    #     """
+    #     print(f'Opening connection with {self.ip} on port {self.specMechPort}')
+    #     self.reader, self.writer = await asyncio.open_connection(
+    #         self.ip, self.specMechPort)
+
+    # async def send_data(self, message):
+    #     """
+    #     Sends the given string to the specMech and then awaits a response.
+    #
+    #     Args:
+    #         message (str): A string that is sent to specMech
+    #     """
+    #     print(f'Sent: {message!r}')
+    #     self.writer.write(message.encode())
+    #     await self.read_data()
+
+    # async def read_data(self):
+    #     """
+    #     Awaits responses from specMech until the EOM character '>' is seen.
+    #     The data received from specMech is added to the response variable.
+    #     """
+    #     dataRaw = await self.reader.read(1024)
+    #     dataB = bytearray(dataRaw)
+    #
+    #     # Continue accepting responses until '>' is received
+    #     while bytearray(b'>') not in dataB:
+    #         dataRaw = await self.reader.read(1024)
+    #         dataB.extend(bytearray(dataRaw))
+    #
+    #     print(f'raw = {dataB!r}')
+    #     dataBfixed = dataB.decode('utf-8', 'ignore')
+    #     print(f'fixed = {dataBfixed!r}')
+    #     self.response = dataBfixed
+    #     print(f'Received: {self.response!r}')
 
     async def close_server(self):
         """
