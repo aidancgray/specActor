@@ -523,9 +523,9 @@ class SpecActor(LegacyActor):
         dataRaw = await self.reader.read(1024)
 
         # Continue accepting responses until '>' is received
-        # while bytearray(b'>') not in dataB:
-        #    dataRawTmp = await self.reader.read(1024)
-        #    dataRaw = dataRaw + dataRawTmp
+        while '>' not in dataRaw:
+            dataRawTmp = await self.reader.read(1024)
+            dataRaw = dataRaw + dataRawTmp
 
         self.response = dataRaw
         print(f'Received: {self.response!r}')
