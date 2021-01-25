@@ -21,3 +21,4 @@ semantic-version==2.8.5
 six==1.15.0
 wcwidth==0.2.5
 yarl==1.6.3
+telnetlib3~=1.0.3
