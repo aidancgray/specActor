@@ -5,16 +5,16 @@
 # aidan.gray@idg.jhu.edu
 #
 # This is an actor for the BOSS specMech hardware microcontroller.
-from abc import ABC
 
+from abc import ABC
 from clu import LegacyActor, command_parser
 from contextlib import suppress
+from telnetlib3 import *
+import telnetlib3
 import clu
 import asyncio
 import click
 import warnings
-from telnetlib3 import *
-import telnetlib3
 
 
 # Extending the handle_subnegotiation method of TelnetWriter from telnetlib3
