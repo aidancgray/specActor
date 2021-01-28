@@ -25,13 +25,21 @@ async def test(command, msg):
 
 
 @command_parser.command()
-async def ACK(command):
+async def command_list(command):
+    """
+    'command-list' prints the list of currently running commands
+    """
+    messageCode = ':'
+    command.write(messageCode, commands=f'{specActor.commandQueue!r}')
+
+
+@command_parser.command()
+async def ack(command):
     """
     'ACK' command acknowledges the specMech has rebooted and informs the user
     """
-    dataTemp = '!\r'
     specActor.response = ''
-    await specActor.send_data(dataTemp)
+    await specActor.send_data('!')
 
     if '$S2ERR*24' in specActor.response:
         messageCode = 'f'
@@ -50,9 +58,8 @@ async def talk(command, data):
     Args:
         data (str): The string to send to specMech
     """
-    dataTemp = data+'\r'
     specActor.response = ''
-    await specActor.send_data(dataTemp)
+    await specActor.send_data(data)
 
     if '$S2ERR*24' in specActor.response:
         messageCode = 'f'
@@ -74,7 +81,7 @@ async def focus(command, offset):
     Args:
         offset (int): Piston all collimator motors together by this value
     """
-    dataTemp = f'mp{offset}\r'
+    dataTemp = f'mp{offset}'
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
@@ -98,7 +105,7 @@ async def set_time(command, time):
     Args:
         time (str): The clock time in format: YYYY-MM-DDThh:mm:ss
     """
-    dataTemp = f'st{time}\r'
+    dataTemp = f'st{time}'
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
@@ -127,15 +134,15 @@ async def expose(command, exposure):
                         everything that is open.
     """
     if exposure == 'left':
-        dataTemp = 'el\r'
+        dataTemp = 'el'
     elif exposure == 'right':
-        dataTemp = 'er\r'
+        dataTemp = 'er'
     elif exposure == 'start':
-        dataTemp = 'es\r'
+        dataTemp = 'es'
     elif exposure == 'end':
-        dataTemp = 'ee\r'
+        dataTemp = 'ee'
     else:
-        dataTemp = 'es\r'
+        dataTemp = 'es'
 
     specActor.response = ''
     await specActor.send_data(dataTemp)
@@ -162,13 +169,13 @@ async def openDoor(command, door):
         door (str): This can be left/right/shutter.
     """
     if door == 'left':
-        dataTemp = 'ol\r'
+        dataTemp = 'ol'
     elif door == 'right':
-        dataTemp = 'or\r'
+        dataTemp = 'or'
     elif door == 'shutter':
-        dataTemp = 'os\r'
+        dataTemp = 'os'
     else:
-        dataTemp = 'os\r'
+        dataTemp = 'os'
 
     specActor.response = ''
     await specActor.send_data(dataTemp)
@@ -195,13 +202,13 @@ async def closeDoor(command, door):
         door (str): This can be left/right/shutter.
     """
     if door == 'left':
-        dataTemp = 'cl\r'
+        dataTemp = 'cl'
     elif door == 'right':
-        dataTemp = 'cr\r'
+        dataTemp = 'cr'
     elif door == 'shutter':
-        dataTemp = 'cs\r'
+        dataTemp = 'cs'
     else:
-        dataTemp = 'cs\r'
+        dataTemp = 'cs'
 
     specActor.response = ''
     await specActor.send_data(dataTemp)
@@ -218,12 +225,25 @@ async def closeDoor(command, door):
 
 
 @command_parser.command()
-async def status(command):
+@click.argument('STAT', type=click.Choice(['time', 'version', 'env', 'vac', '']),
+                default='')
+async def status(command, stat):
     """
     'status' command queries specMech for all status responses
     """
+    if stat == 'time':
+        dataTemp = 'rt'
+    elif stat == 'version':
+        dataTemp = 'rV'
+    elif stat == 'env':
+        dataTemp = 're'
+    elif stat == 'vac':
+        dataTemp = 'rv'
+    else:
+        dataTemp = 'rs'
+
     specActor.response = ''
-    await specActor.send_data('rs\r')
+    await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
         messageCode = 'f'
@@ -236,7 +256,7 @@ async def status(command):
 
         # Parse the status response. Write a reply to the user for each relevant
         #  status string. This may be changed later.
-        statusList = specActor.response.split("\r\n")
+        statusList = specActor.response.split("\r\x00\n")
         strpList = []
 
         for n in statusList:  # separate the individual status responses
@@ -249,99 +269,92 @@ async def status(command):
         for m in strpList:  # for each status response, split up the components
             finalList.append(m.split(','))
 
-        # initialize all keyword vars, just to be safe
-        btm = mra = mrb = mrc = env0t = env0h = env1t = env1h = env2t = env2h = ''
-        env3t = env3h = ionr = ionb = accx = accy = accz = pnus = pnul = pnur = ''
-        pnup = tim = ver = ''
-
         for stat in finalList:  # establish each keyword=value pair
-            if stat[0] == 'BTM':
-                btm = stat[1]
-
-            elif stat[0] == 'MRA':
+            if stat[0] == 'MRA':
                 mra = stat[1]
+                command.write(messageCode,
+                              motorPositionA=f'(motorA={mra})')
 
             elif stat[0] == 'MRB':
                 mrb = stat[1]
+                command.write(messageCode,
+                              motorPositionB=f'(motorB={mrb})')
 
             elif stat[0] == 'MRC':
                 mrc = stat[1]
+                command.write(messageCode,
+                              motorPositionC=f'(motorC={mrc})')
 
             elif stat[0] == 'ENV':
-                env0t = stat[1]
-                env0h = stat[2]
-                env1t = stat[4]
-                env1h = stat[5]
-                env2t = stat[7]
-                env2h = stat[8]
-                env3t = stat[10]
-                env3h = stat[11]
-
-            elif stat[0] == 'ION':
-                ionr = stat[1]
-                ionb = stat[3]
+                env0T = stat[2]
+                env0H = stat[3]
+                env1T = stat[4]
+                env1H = stat[5]
+                env2T = stat[6]
+                env2H = stat[7]
+                specMechT = stat[8]
+                command.write(messageCode,
+                              environments=f'(Temperature0={env0T}, Humidity0={env0H}, '
+                                           f'Temperature1={env1T}, Humidity1={env1H}, '
+                                           f'Temperature2={env2T}, Humidity2={env2H}, '
+                                           f'SpecMechTemp={specMechT})')
 
             elif stat[0] == 'ACC':
                 accx = stat[1]
                 accy = stat[2]
                 accz = stat[3]
+                command.write(messageCode,
+                              accelerometer=f'(xAxis={accx}, yAxis={accy}, zAxis={accz})')
 
             elif stat[0] == 'PNU':
                 # change the c/o/t and 0/1 responses of specMech
                 # to something more readable
-                if stat[1] == 'c':
+                if stat[2] == 'c':
                     pnus = 'closed'
-                elif stat[1] == 'o':
+                elif stat[2] == 'o':
                     pnus = 'open'
                 else:
                     pnus = 'transiting'
 
-                if stat[3] == 'c':
+                if stat[4] == 'c':
                     pnul = 'closed'
-                elif stat[3] == 'o':
+                elif stat[4] == 'o':
                     pnul = 'open'
                 else:
                     pnul = 'transiting'
 
-                if stat[5] == 'c':
+                if stat[6] == 'c':
                     pnur = 'closed'
-                elif stat[5] == 'o':
+                elif stat[6] == 'o':
                     pnur = 'open'
                 else:
                     pnur = 'transiting'
 
-                if stat[7] == '0':
+                if stat[8] == '0':
                     pnup = 'off'
-                elif stat[7] == '1':
+                else:
                     pnup = 'on'
 
+                command.write(messageCode,
+                              pneumatics=f'(shutter={pnus}, leftHartmann={pnul}, '
+                                         f'rightHartmann={pnur}, airPressure={pnup})')
+
             elif stat[0] == 'TIM':
-                tim = stat[1]
+                tim = stat[2]
+                btm = stat[4]
+                command.write(messageCode,
+                              timeInfo=f'(bootTime={btm}, clockTime={tim})')
 
             elif stat[0] == 'VER':
-                ver = stat[1]
+                ver = stat[2]
+                command.write(messageCode,
+                              version=f'({ver})')
 
-        command.write(messageCode,
-                      systemInfo=f'(bootTime={btm}, clockTime={tim}, version={ver})')
-
-        command.write(messageCode,
-                      motorPositions=f'(motorA={mra}, motorB={mrb}, motorC={mrc})')
-
-        command.write(messageCode,
-                      environments=f'(Temperature0={env0t}, Humidity0={env0h}, '
-                                   f'Temperature1={env1t}, Humidity1={env1h}, '
-                                   f'Temperature2={env2t}, Humidity2={env2h}, '
-                                   f'Temperature3={env3t}, Humidity3={env3h})')
-
-        command.write(messageCode,
-                      ionPumpVoltages=f'(redDewarVoltage={ionr}, blueDewarVoltage={ionb})')
-
-        command.write(messageCode,
-                      accelerometer=f'(xAxis={accx}, yAxis={accy}, zAxis={accz})')
-
-        command.write(messageCode,
-                      pneumatics=f'(shutter={pnus}, leftHartmann={pnul}, '
-                                 f'rightHartmann={pnur}, airPressure={pnup})')
+            elif stat[0] == 'VAC':
+                red = stat[2]
+                blue = stat[4]
+                command.write(messageCode,
+                              VacPumps=f'(redDewar={red}, blueDewar={blue})')
 
         command.finish()
 
@@ -360,6 +373,8 @@ class SpecActor(LegacyActor):
         self.writer = None
         self.response = '>'
         self.reboot = False
+        self.commandNumber = 0
+        self.commandQueue = []
 
         # For the specMech emulator connection
         # self.ip = '127.0.0.1'
@@ -400,12 +415,12 @@ class SpecActor(LegacyActor):
         """
         print(f'Opening connection with {self.ip} on port {self.specMechPort}')
 
-        def handler(loop, context):
-            print('caught!')
-            pass
+        # def handler(loop, context):
+        #     print('caught!')
+        #     pass
 
         loop = asyncio.get_running_loop()
-        loop.set_exception_handler(handler)
+        # loop.set_exception_handler(handler)
 
         telTask = loop.create_task(telnetlib3.open_connection(self.ip, self.specMechPort))
         self.reader, self.writer = await telTask
@@ -417,8 +432,16 @@ class SpecActor(LegacyActor):
         Args:
             message (str): A string that is sent to specMech
         """
-        print(f'Sent: {message!r}')
-        self.writer.write(message)
+        # Increment commandNumber, add the command + id to the queue
+        self.commandNumber += 1
+        self.commandQueue.append({'id': self.commandNumber, 'command': message})
+
+        # Add command identifier to the message
+        messageFinal = message + ';' + str(self.commandNumber) + '\r'
+
+        # Send the message
+        print(f'Sent: {messageFinal!r}')
+        self.writer.write(messageFinal)
         await self.read_data()
 
     async def read_data(self):
@@ -440,6 +463,23 @@ class SpecActor(LegacyActor):
 
         self.response = dataRaw
         print(f'Received: {self.response!r}')
+        await self.pop_from_queue()
+
+    async def pop_from_queue(self):
+        # Parse the status response. Write a reply to the user for each relevant
+        #  status string. This may be changed later.
+        statusList = self.response.split("\r\x00\n")
+        strpList = []
+
+        for n in statusList:  # separate the individual status responses
+            if '$S2' in n:
+                tempStr1 = n[3:]  # remove '$S2'
+                tempStr2 = tempStr1.split('*')[0]  # remove the NMEA checksum
+                strpList.append(tempStr2)
+
+        finalList = []
+        for m in strpList:  # for each status response, split up the components
+            finalList.append(m.split(','))
 
     async def close_server(self):
         """
