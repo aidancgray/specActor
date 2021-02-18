@@ -13,6 +13,15 @@ import clu
 import asyncio
 import click
 import warnings
+import sys
+
+
+def custom_except_hook(exctype, value, traceback):
+    print(exctype, value)
+    if exctype == ValueError:
+        pass
+    else:
+        sys.__excepthook__(exctype, value, traceback)
 
 
 @command_parser.command()
@@ -505,10 +514,12 @@ async def main():
     with suppress(asyncio.CancelledError):
         await actor_server()
 
+
 if __name__ == "__main__":
     specActor = SpecActor()
 
     try:
+        sys.excepthook = custom_except_hook
         asyncio.run(main())
     except KeyboardInterrupt:
         print('~~~Keyboard Interrupt~~~')
