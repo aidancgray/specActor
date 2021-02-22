@@ -6,22 +6,21 @@
 #
 # This is an actor for the BOSS specMech hardware microcontroller.
 
+import clu
 from clu import LegacyActor, command_parser
 from contextlib import suppress
+
+from sdsstools import get_logger
+
 import telnetlib3
-import clu
 import asyncio
 import click
 import warnings
-import sys
 
 
-def custom_except_hook(exctype, value, traceback):
-    print(exctype, value)
-    if exctype == ValueError:
-        pass
-    else:
-        sys.__excepthook__(exctype, value, traceback)
+NAME = 'sdss-boss-specActor'
+log = get_logger(NAME)
+log.start_file_logger('~/Desktop/specActor.log')
 
 
 @command_parser.command()
@@ -51,6 +50,7 @@ async def ack(command):
     await specActor.send_data('!')
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     else:
@@ -71,6 +71,7 @@ async def talk(command, data):
     await specActor.send_data(data)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, SPECMECH=f'{repr(specActor.response)}')
     elif specActor.reboot:
@@ -95,6 +96,7 @@ async def focus(command, offset):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -119,6 +121,7 @@ async def set_time(command, time):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -157,6 +160,7 @@ async def expose(command, exposure):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -190,6 +194,7 @@ async def openDoor(command, door):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -223,6 +228,7 @@ async def closeDoor(command, door):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -255,6 +261,7 @@ async def status(command, stat):
     await specActor.send_data(dataTemp)
 
     if '$S2ERR*24' in specActor.response:
+        log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
     elif specActor.reboot:
@@ -386,12 +393,12 @@ class SpecActor(LegacyActor):
         self.commandQueue = []
 
         # For the specMech emulator connection
-        # self.ip = '127.0.0.1'
-        # self.specMechPort = 8888
+        self.ip = '127.0.0.1'
+        self.specMechPort = 8888
 
         # For the real specMech connection
-        self.ip = 'specmech.mywire.org'
-        self.specMechPort = 23
+        # self.ip = 'specmech.mywire.org'
+        # self.specMechPort = 23
 
     async def start(self):
         """Starts the server and the Tron client connection."""
@@ -424,12 +431,8 @@ class SpecActor(LegacyActor):
         """
         print(f'Opening connection with {self.ip} on port {self.specMechPort}')
 
-        # def handler(loop, context):
-        #     print('caught!')
-        #     pass
-
         loop = asyncio.get_running_loop()
-        # loop.set_exception_handler(handler)
+        loop.set_exception_handler(log.asyncio_exception_handler)
 
         telTask = loop.create_task(telnetlib3.open_connection(self.ip, self.specMechPort))
         self.reader, self.writer = await telTask
@@ -490,6 +493,8 @@ class SpecActor(LegacyActor):
         for m in strpList:  # for each status response, split up the components
             finalList.append(m.split(','))
 
+        # print(finalList)
+
     async def close_server(self):
         """
         Closes the connection with specMech
@@ -519,7 +524,6 @@ if __name__ == "__main__":
     specActor = SpecActor()
 
     try:
-        sys.excepthook = custom_except_hook
         asyncio.run(main())
     except KeyboardInterrupt:
         print('~~~Keyboard Interrupt~~~')
