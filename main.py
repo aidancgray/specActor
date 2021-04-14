@@ -393,12 +393,12 @@ class SpecActor(LegacyActor):
         self.commandQueue = []
 
         # For the specMech emulator connection
-        self.ip = '127.0.0.1'
-        self.specMechPort = 8888
+        # self.ip = '127.0.0.1'
+        # self.specMechPort = 8888
 
         # For the real specMech connection
-        # self.ip = 'specmech.mywire.org'
-        # self.specMechPort = 23
+        self.ip = 'specmech.mywire.org'
+        self.specMechPort = 23
 
     async def start(self):
         """Starts the server and the Tron client connection."""
@@ -444,12 +444,16 @@ class SpecActor(LegacyActor):
         Args:
             message (str): A string that is sent to specMech
         """
-        # Increment commandNumber, add the command + id to the queue
-        self.commandNumber += 1
-        self.commandQueue.append({'id': self.commandNumber, 'command': message})
+        # Only send '!\r' to acknowledge a reboot
+        if message == '!':
+            messageFinal = message + '\r'
+        else:
+            # Increment commandNumber, add the command + id to the queue
+            self.commandNumber += 1
+            self.commandQueue.append({'id': self.commandNumber, 'command': message})
 
-        # Add command identifier to the message
-        messageFinal = message + ';' + str(self.commandNumber) + '\r'
+            # Add command identifier to the message
+            messageFinal = message + ';' + str(self.commandNumber) + '\r'
 
         # Send the message
         print(f'Sent: {messageFinal!r}')
