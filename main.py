@@ -49,7 +49,7 @@ async def ack(command):
     specActor.response = ''
     await specActor.send_data('!')
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -70,7 +70,7 @@ async def talk(command, data):
     specActor.response = ''
     await specActor.send_data(data)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, SPECMECH=f'{repr(specActor.response)}')
@@ -95,7 +95,7 @@ async def focus(command, offset):
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -120,7 +120,7 @@ async def set_time(command, time):
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -159,7 +159,7 @@ async def expose(command, exposure):
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -193,7 +193,7 @@ async def openDoor(command, door):
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -227,7 +227,7 @@ async def closeDoor(command, door):
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -240,7 +240,9 @@ async def closeDoor(command, door):
 
 
 @command_parser.command()
-@click.argument('STAT', type=click.Choice(['time', 'version', 'env', 'vac', '']),
+@click.argument('STAT', type=click.Choice(['time', 'version', 'environment', 'vacuum',
+                                           'motor-a', 'motor-b', 'motor-c',
+                                           'orientation', 'pneumatics', '']),
                 default='')
 async def status(command, stat):
     """
@@ -250,17 +252,27 @@ async def status(command, stat):
         dataTemp = 'rt'
     elif stat == 'version':
         dataTemp = 'rV'
-    elif stat == 'env':
+    elif stat == 'environment':
         dataTemp = 're'
-    elif stat == 'vac':
+    elif stat == 'vacuum':
         dataTemp = 'rv'
+    elif stat == 'motor-a':
+        dataTemp = 'ra'
+    elif stat == 'motor-b':
+        dataTemp = 'rb'
+    elif stat == 'motor-c':
+        dataTemp = 'rc'
+    elif stat == 'orientation':
+        dataTemp = 'ro'
+    elif stat == 'pneumatics':
+        dataTemp = 'rp'
     else:
         dataTemp = 'rs'
 
     specActor.response = ''
     await specActor.send_data(dataTemp)
 
-    if '$S2ERR*24' in specActor.response:
+    if '$S1ERR' in specActor.response:
         log.error("Unknown error response from specMech")
         messageCode = 'f'
         command.write(messageCode, text='ERR')
@@ -276,8 +288,8 @@ async def status(command, stat):
         strpList = []
 
         for n in statusList:  # separate the individual status responses
-            if '$S2' in n:
-                tempStr1 = n[3:]  # remove '$S2'
+            if '$S1' in n:
+                tempStr1 = n[3:]  # remove '$S1'
                 tempStr2 = tempStr1.split('*')[0]  # remove the NMEA checksum
                 strpList.append(tempStr2)
 
@@ -286,39 +298,37 @@ async def status(command, stat):
             finalList.append(m.split(','))
 
         for stat in finalList:  # establish each keyword=value pair
-            if stat[0] == 'MRA':
-                mra = stat[1]
+            if stat[0] == 'MTR':
+                mtr = stat[2]
+                mtrPosition = stat[3]
+                mtrPositionUnits = stat[4]
+                mtrSpeed = stat[5]
+                mtrSpeedUnits = stat[6]
+                mtrCurrent = stat[7]
+                mtrCurrentUnits = stat[8]
                 command.write(messageCode,
-                              motorPositionA=f'(motorA={mra})')
-
-            elif stat[0] == 'MRB':
-                mrb = stat[1]
-                command.write(messageCode,
-                              motorPositionB=f'(motorB={mrb})')
-
-            elif stat[0] == 'MRC':
-                mrc = stat[1]
-                command.write(messageCode,
-                              motorPositionC=f'(motorC={mrc})')
+                              motor=f'({mtr},{mtrPosition} {mtrPositionUnits},'
+                                    f'{mtrSpeed} {mtrSpeedUnits},'
+                                    f'{mtrCurrent} {mtrCurrentUnits})')
 
             elif stat[0] == 'ENV':
-                env0T = stat[2]
-                env0H = stat[3]
-                env1T = stat[4]
-                env1H = stat[5]
-                env2T = stat[6]
-                env2H = stat[7]
-                specMechT = stat[8]
+                env0T = stat[2] + ' ' + stat[3]
+                env0H = stat[4] + ' ' + stat[5]
+                env1T = stat[6] + ' ' + stat[7]
+                env1H = stat[8] + ' ' + stat[9]
+                env2T = stat[10] + ' ' + stat[11]
+                env2H = stat[12] + ' ' + stat[13]
+                specMechT = stat[14] + ' ' + stat[15]
                 command.write(messageCode,
                               environments=f'(Temperature0={env0T}, Humidity0={env0H}, '
                                            f'Temperature1={env1T}, Humidity1={env1H}, '
                                            f'Temperature2={env2T}, Humidity2={env2H}, '
                                            f'SpecMechTemp={specMechT})')
 
-            elif stat[0] == 'ACC':
-                accx = stat[1]
-                accy = stat[2]
-                accz = stat[3]
+            elif stat[0] == 'ORI':
+                accx = stat[2]
+                accy = stat[3]
+                accz = stat[4]
                 command.write(messageCode,
                               accelerometer=f'(xAxis={accx}, yAxis={accy}, zAxis={accz})')
 
@@ -482,14 +492,13 @@ class SpecActor(LegacyActor):
         await self.pop_from_queue()
 
     async def pop_from_queue(self):
-        # Parse the status response. Write a reply to the user for each relevant
-        #  status string. This may be changed later.
         statusList = self.response.split("\r\x00\n")
+        print('statusList = ', statusList)
         strpList = []
 
         for n in statusList:  # separate the individual status responses
-            if '$S2' in n:
-                tempStr1 = n[3:]  # remove '$S2'
+            if '$S1' in n:
+                tempStr1 = n[3:]  # remove '$S1'
                 tempStr2 = tempStr1.split('*')[0]  # remove the NMEA checksum
                 strpList.append(tempStr2)
 
@@ -497,7 +506,7 @@ class SpecActor(LegacyActor):
         for m in strpList:  # for each status response, split up the components
             finalList.append(m.split(','))
 
-        # print(finalList)
+        print('finalList = ', finalList)
 
     async def close_server(self):
         """
